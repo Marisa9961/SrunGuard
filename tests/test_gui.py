@@ -201,10 +201,12 @@ class GuiTests(unittest.TestCase):
         self.assertIsNotNone(self.window.save())
         self.window._log("unique record in new file")
         current = destination / "guard.log"
-        self.assertEqual(Path(self.window.log_handler.baseFilename), current)
+        # Windows TEMP may use an 8.3 alias; log paths resolve to long names.
+        # Compare file identity, not the spelling of the two paths.
+        self.assertTrue(Path(self.window.log_handler.baseFilename).samefile(current))
         self.assertIn("unique record", current.read_text(encoding="utf-8"))
         self.assertNotIn("unique record", previous.read_text(encoding="utf-8"))
-        self.assertIn(str(current), self.window.active_log_path.text())
+        self.assertIn(str(current.resolve()), self.window.active_log_path.text())
 
     def test_invalid_log_directory_preserves_working_handler(self):
         previous = self.window.log_handler
@@ -228,7 +230,7 @@ class GuiTests(unittest.TestCase):
         invalid.write_text("not a directory")
         save_settings(root / "settings.json", Settings(log_directory=str(invalid)))
         self.window = MainWindow(root, onboarding=False)
-        self.assertEqual(Path(self.window.log_handler.baseFilename), root / "guard.log")
+        self.assertTrue(Path(self.window.log_handler.baseFilename).samefile(root / "guard.log"))
         self.assertIn("Log directory unavailable", self.window.logs.toPlainText())
 
     def test_config_save_failure_closes_candidate_and_keeps_old_handler(self):
@@ -351,7 +353,7 @@ class GuiTests(unittest.TestCase):
         self.window._flush_log_summary()
         self.assertEqual(self.window.logs.toPlainText(), before)
         detailed = Path(self.window.detail_handler.baseFilename)
-        self.assertEqual(detailed, Path(self.directory.name) / "logs" / "diagnostics.log")
+        self.assertTrue(detailed.samefile(Path(self.directory.name) / "logs" / "diagnostics.log"))
         text = detailed.read_text(encoding="utf-8")
         self.assertEqual(text.count("Cooldown active"), 1)
         self.assertIn("Suppressed 99 repeated messages", text)
