@@ -9,12 +9,13 @@ from PySide6.QtCore import QTimer
 
 
 def run(app, report: Path) -> int:
+    from . import __version__
     from .gui import MainWindow
     from .protocol import encode_info
     from .monitor import Update
     from .settings import CredentialStore, load_settings
 
-    result = {"ok": False}
+    result = {"ok": False, "version": __version__}
     try:
         with TemporaryDirectory(prefix="srun-selftest-") as directory:
             window = MainWindow(Path(directory), onboarding=False)

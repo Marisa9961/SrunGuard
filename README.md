@@ -2,6 +2,8 @@
 
 基于 Python + PySide6 的深澜 Srun 校园网守护工具，支持断网自动认证和托盘常驻。不预设学校或账号，网络功能独立实现。
 
+![screenshot](docs/assets/screenshot.png)
+
 ## 特性
 
 - 后台检测、断网确认、认证复检与失败退避。
@@ -14,7 +16,9 @@
 
 ## 快速开始
 
-主要面向 **Windows 10/11 x64**。已有构建产物时，直接运行 `SrunGuard.exe`，无需安装 Python。
+前往 **Release** 页面下载最新版本并直接运行 `SrunGuard.exe`，无需安装 Python。
+
+## 源码运行
 
 源码运行需要 **Python 3.10+**，在项目根目录执行：
 
@@ -33,18 +37,6 @@ Linux/macOS 可使用 `.venv/bin/python`，托盘和凭据库支持取决于桌�
 - **退出**：默认关闭窗口只收起到托盘，请使用托盘菜单退出。升级前也应先退出旧进程。
 
 仅适用于兼容的 Srun 门户，不支持验证码等额外交互，也不能修复 Wi-Fi、网线或上游网络故障。请使用可信的 HTTPS 认证地址。
-
-## 日志
-
-界面仅展示断网、认证结果、冷却等重要事件。需要排查时，展开“日志 → 日志设置与排查”打开详细日志。
-
-Windows 默认数据目录为 `%APPDATA%\SrunGuard\`：
-
-- `settings.json`：非密码配置，包含账号，请勿直接公开。
-- `guard.log`：重要事件，可另选存储目录。
-- `logs/diagnostics.log`：详细诊断，固定保存在默认目录。
-
-日志自动轮转并合并重复消息，分享前请检查并脱敏。
 
 ## 构建与测试
 
@@ -67,6 +59,6 @@ Windows 默认数据目录为 `%APPDATA%\SrunGuard\`：
 
 ## 许可证
 
-本项目采用 [MIT License](LICENSE)，Copyright © 2026 Marisa。
+本项目采用 [MIT License](LICENSE)，Copyright © 2026 Marisa9961。
 
 第三方依赖遵循各自的许可证；分发时请保留相应许可声明。
