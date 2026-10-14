@@ -1,6 +1,7 @@
 """Qt desktop UI and tray lifecycle. No network I/O runs on the GUI thread."""
 
 from datetime import datetime
+from contextlib import nullcontext
 import logging
 from pathlib import Path
 import sys
@@ -18,6 +19,7 @@ from .durations import short_duration
 from .logging_utils import LogLimiter, diagnostic_path, log_path, open_log_handler
 from .monitor import Update
 from .settings import CredentialStore, Settings, data_directory, load_settings, save_settings
+from .startup import StartupError, configure_startup
 from .worker import NetworkWorker
 from .setup_dialog import SetupDialog
 from .widgets import DurationEdit
@@ -208,12 +210,22 @@ class MainWindow(QMainWindow):
         password_layout.addWidget(reveal)
         self.remember = QCheckBox("记住密码（仅保存到系统凭据库）")
         self.auto_start = QCheckBox("下次打开程序时自动启动守护")
+        self.start_at_login = QCheckBox("开机自启动（登录 Windows 后）")
+        self.start_at_login.setEnabled(sys.platform == "win32")
+        self.start_at_login.setToolTip("保存设置或启动守护后生效，仅作用于当前用户，无需管理员权限。"
+                                      "程序移动后请重新保存设置。" if sys.platform == "win32" else
+                                      "开机自启动目前仅支持 Windows。")
         self.minimize = QCheckBox("最小化 / 关闭窗口时收起到托盘")
         form.addRow("认证网址", self.portal)
         form.addRow("账号", self.username)
         form.addRow("密码", password_row)
         form.addRow("", self.remember)
         form.addRow("", self.auto_start)
+        form.addRow("", self.start_at_login)
+        startup_hint = QLabel("开机后自动守护：同时勾选“记住密码”和“自动启动守护”。")
+        startup_hint.setObjectName("muted")
+        startup_hint.setWordWrap(True)
+        form.addRow("", startup_hint)
         form.addRow("", self.minimize)
         self.tabs.addTab(basic, "账号与运行")
 
@@ -396,7 +408,7 @@ class MainWindow(QMainWindow):
             getattr(self, name).setText(getattr(settings, name))
         for name in ("interval", "retry_interval", "timeout", "threshold", "max_backoff", "log_repeat_interval"):
             getattr(self, name).setValue(getattr(settings, name))
-        for name in ("remember", "auto_start", "password_hmac"):
+        for name in ("remember", "auto_start", "start_at_login", "password_hmac"):
             getattr(self, name).setChecked(getattr(settings, name))
         self.minimize.setChecked(settings.minimize_to_tray)
 
@@ -408,6 +420,7 @@ class MainWindow(QMainWindow):
             timeout=self.timeout.value(), threshold=self.threshold.value(),
             max_backoff=self.max_backoff.value(), password_hmac=self.password_hmac.isChecked(),
             remember=self.remember.isChecked(), auto_start=self.auto_start.isChecked(),
+            start_at_login=self.start_at_login.isChecked(),
             minimize_to_tray=self.minimize.isChecked(),
             log_directory=self.log_directory.text().strip(),
             log_repeat_interval=self.log_repeat_interval.value(),
@@ -433,7 +446,18 @@ class MainWindow(QMainWindow):
             new_key = (settings.username, settings.portal.rstrip("/").lower())
             if self.saved.remember and (not settings.remember or old_key != new_key):
                 self.vault.delete(self.saved)
-            save_settings(self.config_path, settings)
+            # Leave Windows startup untouched unless it is enabled or was
+            # previously enabled. Ordinary saves and release self-tests do
+            # not create or remove any startup registration.
+            registration = (configure_startup(settings.start_at_login)
+                            if settings.start_at_login or self.saved.start_at_login else nullcontext())
+            with registration:
+                save_settings(self.config_path, settings)
+        except StartupError as exc:
+            if candidate_handler:
+                candidate_handler.close()
+            self._warn(str(exc))
+            return None
         except Exception:
             if candidate_handler:
                 candidate_handler.close()
@@ -619,6 +643,13 @@ class MainWindow(QMainWindow):
     def _can_hide(self) -> bool:
         return self.minimize.isChecked() and QSystemTrayIcon.isSystemTrayAvailable() and not self.quitting
 
+    def show_initial(self, *, startup: bool = False):
+        if (startup and self.saved.auto_start and self.saved.remember and
+                self.saved.portal and self.saved.username and self.password.text() and self._can_hide()):
+            self.tray.show()
+        else:
+            self.show()
+
     def _hide_to_tray(self):
         if not self._can_hide():
             return
@@ -686,6 +717,8 @@ def main() -> int:
     lock = QLockFile(str(directory / "instance.lock"))
     lock.setStaleLockTime(0)
     if not lock.tryLock(0):
+        if "--startup" in sys.argv[1:]:
+            return 0
         QMessageBox.information(None, "Srun Guard", "程序已在运行，或配置目录无法加锁。请检查系统托盘和目录权限。")
         return 1
     try:
@@ -694,7 +727,7 @@ def main() -> int:
         QMessageBox.critical(None, "Srun Guard", "无法读取配置或创建日志，请检查配置目录权限。")
         lock.unlock()
         return 1
-    window.show()
+    window.show_initial(startup="--startup" in sys.argv[1:])
     result = app.exec()
     lock.unlock()
     return result

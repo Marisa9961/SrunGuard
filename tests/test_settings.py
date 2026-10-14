@@ -25,6 +25,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(settings.interval, 1800)
         self.assertEqual(settings.retry_interval, 10800)
         self.assertEqual(settings.max_backoff, 10800)
+        self.assertFalse(settings.start_at_login)
         settings.validate(credentials=False)
         with self.assertRaises(ValueError):
             settings.validate()
@@ -38,6 +39,16 @@ class SettingsTests(unittest.TestCase):
             path = Path(directory) / "settings.json"
             settings = Settings(portal="https://portal.example.org", username="test",
                                 interval=60, retry_interval=120, max_backoff=3600)
+            save_settings(path, settings)
+            self.assertEqual(load_settings(path), settings)
+
+    def test_startup_preference_roundtrip_and_legacy_default(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "settings.json"
+            path.write_text('{"schema_version":2,"auto_start":true}')
+            self.assertFalse(load_settings(path).start_at_login)
+            self.assertTrue(load_settings(path).auto_start)
+            settings = Settings(start_at_login=True)
             save_settings(path, settings)
             self.assertEqual(load_settings(path), settings)
 

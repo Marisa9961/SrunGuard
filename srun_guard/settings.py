@@ -21,6 +21,7 @@ class Settings:
     password_hmac: bool = False
     remember: bool = False
     auto_start: bool = False
+    start_at_login: bool = False
     minimize_to_tray: bool = True
     log_directory: str = ""
     log_repeat_interval: int = 300

@@ -1,6 +1,8 @@
 """Offscreen GUI/worker smoke tests: no campus access or real credentials needed."""
 
 import os
+from contextlib import nullcontext
+from dataclasses import replace
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from pathlib import Path
@@ -17,6 +19,7 @@ from srun_guard.gui import MainWindow, STYLE
 from srun_guard.monitor import ReconnectMonitor, Update
 from srun_guard.network import Cancelled
 from srun_guard.settings import Settings, save_settings
+from srun_guard.startup import StartupError
 
 
 class OnlineClient:
@@ -323,6 +326,60 @@ class GuiTests(unittest.TestCase):
         self.assertTrue(self.window.config_path.exists())
         self.assertNotIn("Settings saved", self.window.logs.toPlainText())
         self.assertIn("Settings saved", Path(self.window.detail_handler.baseFilename).read_text(encoding="utf-8"))
+
+    def test_startup_checkbox_registers_and_unregisters_on_save(self):
+        with patch("srun_guard.gui.configure_startup", side_effect=lambda enabled: nullcontext()) as register, \
+                patch("srun_guard.gui.NetworkWorker") as worker:
+            self.window.start_at_login.setChecked(True)
+            self.assertIsNotNone(self.window.save())
+            self.assertTrue(self.window.saved.start_at_login)
+            self.window.start_at_login.setChecked(False)
+            self.assertIsNotNone(self.window.save())
+            self.assertFalse(self.window.saved.start_at_login)
+            self.assertEqual([call.args[0] for call in register.call_args_list], [True, False])
+            worker.assert_not_called()
+
+    def test_ordinary_save_does_not_touch_windows_startup(self):
+        with patch("srun_guard.gui.configure_startup") as register:
+            self.assertIsNotNone(self.window.save())
+            register.assert_not_called()
+
+    def test_startup_permission_failure_keeps_saved_settings_and_log_handler(self):
+        self.window.start_at_login.setChecked(True)
+        previous = self.window.log_handler
+        with patch("srun_guard.gui.configure_startup", side_effect=StartupError("启动项权限不足")), \
+                patch.object(self.window, "_warn") as warn:
+            self.assertIsNone(self.window.save())
+            warn.assert_called_once_with("启动项权限不足")
+        self.assertFalse(self.window.saved.start_at_login)
+        self.assertIs(self.window.log_handler, previous)
+        self.assertFalse(self.window.config_path.exists())
+
+    def test_startup_hides_configured_guard_only_when_tray_is_available(self):
+        self.window.saved = replace(self.window.saved, portal="https://portal.example.org", username="test",
+                                    remember=True, auto_start=True)
+        self.window.hide()
+        with patch("srun_guard.gui.QSystemTrayIcon.isSystemTrayAvailable", return_value=True), \
+                patch.object(self.window.tray, "show") as show:
+            self.window.show_initial(startup=True)
+            self.assertFalse(self.window.isVisible())
+            show.assert_called_once()
+        with patch("srun_guard.gui.QSystemTrayIcon.isSystemTrayAvailable", return_value=False):
+            self.window.show_initial(startup=True)
+            self.assertTrue(self.window.isVisible())
+
+    def test_startup_without_password_and_manual_launch_show_window(self):
+        self.window.saved = replace(self.window.saved, portal="https://portal.example.org", username="test",
+                                    remember=True, auto_start=True)
+        with patch("srun_guard.gui.QSystemTrayIcon.isSystemTrayAvailable", return_value=True):
+            self.window.password.clear()
+            self.window.hide()
+            self.window.show_initial(startup=True)
+            self.assertTrue(self.window.isVisible())
+            self.window.password.setText("test-password")
+            self.window.hide()
+            self.window.show_initial()
+            self.assertTrue(self.window.isVisible())
 
     @patch("srun_guard.worker.SrunClient", OnlineClient)
     def test_migrated_values_match_display_and_worker(self):
