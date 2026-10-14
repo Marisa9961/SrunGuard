@@ -55,12 +55,14 @@ def command(mode: str, compiler: str, jobs: int, version: str = __version__) -> 
     args = [sys.executable, "-m", "nuitka", f"--mode={mode}",
             "--enable-plugin=pyside6", "--include-qt-plugins=platforms,styles",
             "--include-distribution-metadata=keyring", "--assume-yes-for-downloads",
+            f"--include-data-files={ROOT / 'assets' / 'SrunGuard.svg'}=assets/SrunGuard.svg",
             f"--output-dir={output}", f"--jobs={jobs}",
             f"--report={output / 'compilation-report.xml'}",
             "--product-name=Srun Guard", f"--product-version={windows_version}",
             f"--file-version={windows_version}", "--file-description=Srun campus network guard"]
     if sys.platform == "win32":
         args += ["--windows-console-mode=disable", "--output-filename=SrunGuard.exe",
+                 f"--windows-icon-from-ico={ROOT / 'assets' / 'SrunGuard.ico'}",
                  "--include-module=keyring.backends.Windows", "--include-package=win32ctypes",
                  "--nofollow-import-to=win32ctypes.tests"]
     else:
@@ -110,6 +112,10 @@ def main() -> int:
         if target.exists():
             shutil.rmtree(target)
         shutil.copytree(source, target)
+    documentation = release if options.mode == "onefile" else target
+    (documentation / "licenses").mkdir(exist_ok=True)
+    shutil.copy2(ROOT / "licenses" / "THIRD_PARTY_NOTICES.md",
+                 documentation / "licenses" / "THIRD_PARTY_NOTICES.md")
     print(f"Release: {target}")
     return 0
 

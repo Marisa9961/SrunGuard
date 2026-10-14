@@ -6,7 +6,8 @@ from pathlib import Path
 import sys
 
 from PySide6.QtCore import QEvent, QLockFile, Qt, QTimer, QUrl
-from PySide6.QtGui import QAction, QColor, QDesktopServices, QIcon, QPainter, QPen, QPixmap
+from PySide6.QtGui import QAction, QDesktopServices, QIcon, QPainter, QPixmap
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QFileDialog, QFormLayout, QFrame, QHBoxLayout, QLabel,
     QLineEdit, QMainWindow, QMenu, QMessageBox, QPlainTextEdit, QPushButton,
@@ -30,19 +31,21 @@ STATES = {
 }
 
 
-def make_icon(color: str = "#2563eb") -> QIcon:
-    pixmap = QPixmap(64, 64)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setBrush(QColor(color))
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.drawRoundedRect(4, 4, 56, 56, 16, 16)
-    painter.setPen(QPen(QColor("white"), 5, Qt.PenStyle.SolidLine, Qt.PenCapStyle.RoundCap))
-    painter.drawLine(19, 36, 28, 45)
-    painter.drawLine(28, 45, 46, 22)
-    painter.end()
-    return QIcon(pixmap)
+def make_icon(color: str | None = None) -> QIcon:
+    source = (Path(__file__).resolve().parent.parent / "assets" /
+              "SrunGuard.svg").read_bytes()
+    if color:
+        source = source.replace(b"#2F88FF", color.encode("ascii"))
+    renderer = QSvgRenderer(source)
+    icon = QIcon()
+    for size in (16, 24, 32, 48, 64, 128, 256):
+        pixmap = QPixmap(size, size)
+        pixmap.fill(Qt.GlobalColor.transparent)
+        painter = QPainter(pixmap)
+        renderer.render(painter)
+        painter.end()
+        icon.addPixmap(pixmap)
+    return icon
 
 
 STYLE = """
@@ -668,6 +671,7 @@ class MainWindow(QMainWindow):
 def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("SrunGuard")
+    app.setWindowIcon(make_icon())
     app.setQuitOnLastWindowClosed(False)
     app.setStyle("Fusion")
     app.setStyleSheet(STYLE)

@@ -43,7 +43,8 @@ def package(tag: str, root: Path = ROOT) -> Path:
     dist = root / "dist"
     # Whitelist release contents. Never archive the whole build/config directory.
     files = [dist / "SrunGuard.exe", dist / "SrunGuard.exe.sha256",
-             root / "README.md", root / "LICENSE"]
+             root / "README.md", root / "LICENSE",
+             root / "licenses" / "THIRD_PARTY_NOTICES.md"]
     for path in files:
         if not path.is_file() or path.stat().st_size == 0:
             raise ValueError(f"Missing or empty release file: {path.name}")
@@ -57,7 +58,8 @@ def package(tag: str, root: Path = ROOT) -> Path:
     try:
         with zipfile.ZipFile(temporary, "w", zipfile.ZIP_DEFLATED) as output:
             for path in files:
-                output.write(path, f"SrunGuard/{path.name}")
+                name = path.name if path.parent == dist else path.relative_to(root).as_posix()
+                output.write(path, f"SrunGuard/{name}")
             output.writestr("SrunGuard/VERSION", version + "\n")
         temporary.replace(archive)
     finally:

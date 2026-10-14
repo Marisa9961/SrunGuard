@@ -62,3 +62,6 @@ Linux/macOS 可使用 `.venv/bin/python`，托盘和凭据库支持取决于桌�
 本项目采用 [MIT License](LICENSE)，Copyright © 2026 Marisa9961。
 
 第三方依赖遵循各自的许可证；分发时请保留相应许可声明。
+
+应用图标来自 ByteDance IconPark（Apache-2.0）；版权、修改说明及完整许可见
+[第三方图标声明](licenses/THIRD_PARTY_NOTICES.md)，该文件随发布包附带。

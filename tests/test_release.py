@@ -79,6 +79,8 @@ class PackageTests(unittest.TestCase):
         self.checksum.write_text(hashlib.sha256(self.exe.read_bytes()).hexdigest() + "  SrunGuard.exe\n")
         (self.root / "README.md").write_text("# Test README\n")
         (self.root / "LICENSE").write_text("MIT License\n")
+        (self.root / "licenses").mkdir()
+        (self.root / "licenses" / "THIRD_PARTY_NOTICES.md").write_text("IconPark attribution\n")
 
     def test_archive_whitelist_and_checksum(self):
         (self.root / "dist" / "settings.json").write_text('{"password":"do-not-publish"}')
@@ -89,9 +91,12 @@ class PackageTests(unittest.TestCase):
             self.assertEqual(set(contents.namelist()), {
                 "SrunGuard/SrunGuard.exe", "SrunGuard/SrunGuard.exe.sha256",
                 "SrunGuard/README.md", "SrunGuard/LICENSE", "SrunGuard/VERSION",
+                "SrunGuard/licenses/THIRD_PARTY_NOTICES.md",
             })
             self.assertEqual(contents.read("SrunGuard/SrunGuard.exe"), self.exe.read_bytes())
             self.assertEqual(contents.read("SrunGuard/VERSION"), b"1.4.0-rc.1\n")
+            self.assertEqual(contents.read("SrunGuard/licenses/THIRD_PARTY_NOTICES.md"),
+                             (self.root / "licenses" / "THIRD_PARTY_NOTICES.md").read_bytes())
             self.assertIsNone(contents.testzip())
         self.assertEqual(archive.with_suffix(".zip.sha256").read_text(),
                          hashlib.sha256(archive.read_bytes()).hexdigest() + "  " + archive.name + "\n")
@@ -112,6 +117,11 @@ class PackageTests(unittest.TestCase):
     def test_license_required(self):
         (self.root / "LICENSE").unlink()
         with self.assertRaisesRegex(ValueError, "LICENSE"):
+            release.package("v1.4.0", self.root)
+
+    def test_icon_notice_required(self):
+        (self.root / "licenses" / "THIRD_PARTY_NOTICES.md").unlink()
+        with self.assertRaisesRegex(ValueError, "THIRD_PARTY_NOTICES"):
             release.package("v1.4.0", self.root)
 
     def test_smoke_checks_version_and_success(self):
