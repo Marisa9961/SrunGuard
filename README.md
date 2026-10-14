@@ -2,7 +2,7 @@
 
 基于 Python + PySide6 的深澜 Srun 校园网守护工具，支持断网自动认证和托盘常驻。不预设学校或账号，网络功能独立实现。
 
-![screenshot](docs/assets/screenshot.png)
+![screenshot](docs/screenshot.png)
 
 ## 特性
 
